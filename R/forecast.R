@@ -67,7 +67,7 @@ generate_forecast_chart <- function(train, test, forecast_vals, forecast_dates,
     geom_line(data = fc_df, aes(x = date, y = value, color = series), linewidth = 1) +
     geom_point(data = fc_df, aes(x = date, y = value), color = forecast_color, size = 2.2,
                shape = 21, fill = forecast_color, stroke = 0.8) +
-    geom_vline(xintercept = as.numeric(fc_df$date[1]), color = muted_text,
+    geom_vline(xintercept = fc_df$date[1], color = muted_text,
                linewidth = 0.4, linetype = "dotted", alpha = 0.5) +
     geom_text(data = label_df, aes(x = date, y = value,
                                    label = paste0(round(value / 1e6, 1), "M")),
@@ -88,7 +88,7 @@ generate_forecast_chart <- function(train, test, forecast_vals, forecast_dates,
     p <- p + annotate("label", x = max(fc_df$date), y = min(c(train_df$value, test_df$value)),
                       label = paste0("Hold-out MAPE: ", sprintf("%.2f", mape), "%"),
                       hjust = 1, vjust = 0, size = 3.2, color = muted_text,
-                      fill = "white", label.size = 0.3)
+                      fill = "white")
   }
   
   ggsave(output_path, plot = p, width = 12, height = 6, dpi = 150, bg = "white")
