@@ -218,12 +218,7 @@ ampang_ts <- ts(
   frequency = 12
 )
 
-# ---------------------------------------------------------------------------
-# Train / test split
-# 11 months held out for testing (unchanged - 43 train / 11 test)
-# ---------------------------------------------------------------------------
-
-n_test <- 11
+n_test <- 12
 n_train <- n - n_test
 
 train_vals <- ampang_vals[1:n_train]
