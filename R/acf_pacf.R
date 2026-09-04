@@ -15,7 +15,7 @@ library(ggplot2)
 
 generate_acf_pacf_chart <- function(
     x,
-    model_name = "Differenced Series (d = 1)",
+    model_name = "Differenced Seasonally-Adjusted Series (d = 1)",
     output_path = "acf_pacf_comparison.png") {
   
   x <- as.numeric(x)

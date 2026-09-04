@@ -2,8 +2,8 @@ library(forecast)
 
 generate_residuals_chart <- function(
     model,
-    output_path = "arima_residuals.png",
-    model_name = "ARIMA",
+    output_path = "residuals_diagnostic.png",
+    model_name = "STLARIMA",
     width = 3300,
     height = 2400,
     res = 300) {
@@ -18,6 +18,18 @@ generate_residuals_chart <- function(
   options(scipen = 999)
   on.exit(options(scipen = old_scipen), add = TRUE)
   
+  # checkresiduals() does NOT forward a `main =` argument through to its
+  # plot title - `...` is only passed to the internal Box.test() call.
+  # Both the plot title AND the "Residuals from ..." line printed with the
+  # Ljung-Box test are built internally from object$method, which for an
+  # Arima-derived fit is auto-generated as e.g. "ARIMA(2,1,2)" and knows
+  # nothing about the STL wrapping. Overwrite $method on a copy of the
+  # model (stats/residuals are untouched - only the label changes) and use
+  # that copy everywhere checkresiduals() is called, so both the chart
+  # title and the printed test output say STLARIMA instead of ARIMA.
+  model_for_plot <- model
+  model_for_plot$method <- model_name
+  
   png(
     output_path,
     width = width,
@@ -25,7 +37,7 @@ generate_residuals_chart <- function(
     res = res
   )
   
-  checkresiduals(model)
+  checkresiduals(model_for_plot)
   
   dev.off()
   
@@ -36,7 +48,7 @@ generate_residuals_chart <- function(
   )
   
   lb_test <- tryCatch(
-    checkresiduals(model, plot = FALSE),
+    checkresiduals(model_for_plot, plot = FALSE),
     error = function(e) NULL
   )
   

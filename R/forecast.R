@@ -32,7 +32,7 @@ base_theme <- function() {
 # ---------------------------------------------------------------------------
 generate_forecast_chart <- function(train, test, forecast_vals, forecast_dates,
                                     mape = NULL, output_path = "forecast.png",
-                                    title_suffix = "", model_name = "ARIMA(1,1,0)") {
+                                    title_suffix = "", model_name = "STLARIMA(0,1,0)") {
   
   train_label <- sprintf(
     "Training (%s - %s)",
