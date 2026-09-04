@@ -4,22 +4,13 @@ library(zoo)
 library(ggplot2)
 library(tidyr)
 
-# ---------------------------------------------------------------------------
-# MCO known-intervention imputation - CONTEXT / EXHIBIT ONLY.
-# Not used by the finalized ARIMA(1,1,0) model. Shows what LRT Ampang
-# ridership would likely have looked like without the MCO lockdown shock:
-#   1. Linear interpolation across the MCO window (initial fill).
-#   2. STL decomposition on that interpolated series; the MCO window is
-#      replaced with STL trend + seasonal (dropping the remainder).
-# ---------------------------------------------------------------------------
-
 csv_path    <- "ridership_headline.csv"
 start_date  <- as.Date("2019-01-01")
 mco_start   <- as.Date("2020-03-01")
 mco_end     <- as.Date("2021-12-01")
 output_path <- "mco_imputation_comparison.png"
 
-# --- 1. Load full history and aggregate to monthly totals -----------------
+
 df <- read_csv(csv_path, show_col_types = FALSE)
 
 df_ampang <- df %>%
@@ -36,7 +27,6 @@ monthly <- df_ampang %>%
 expected_months <- seq(min(monthly$month), max(monthly$month), by = "month")
 stopifnot(all(expected_months == monthly$month))
 
-# --- 2. Mask the MCO window as NA ------------------------------------------
 monthly <- monthly %>%
   mutate(
     is_mco = month >= mco_start & month <= mco_end,
@@ -44,12 +34,9 @@ monthly <- monthly %>%
     value_masked = ifelse(is_mco, NA, value)
   )
 
-# --- 3. Step 1: linear interpolation across the masked gap -----------------
 monthly <- monthly %>%
   mutate(value_linear = na.approx(value_masked, x = month, na.rm = FALSE))
 
-# --- 4. Step 2: STL on the interpolated series, reconstruct MCO window
-#        from trend + seasonal only -----------------------------------------
 value_ts <- ts(
   monthly$value_linear,
   start = c(as.integer(format(min(monthly$month), "%Y")),
@@ -76,7 +63,6 @@ print(
     select(month, value_raw, value_linear, value_imputed)
 )
 
-# --- 5. Comparison chart ----------------------------------------------------
 plot_df <- monthly %>%
   select(month, value_raw, value_linear, value_imputed) %>%
   pivot_longer(

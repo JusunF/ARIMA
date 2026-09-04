@@ -9,6 +9,7 @@ source("stl_decompose.R")
 source("stl_arima_grid_search.R")
 source("stl_arima_select.R")
 source("forecast.R")
+source("forecast_vs_actual.R")
 source("acf_pacf.R")
 source("residuals_diagnostic.R")
 
@@ -368,7 +369,7 @@ if (length(model_stl_arima$coef) > 0) {
 # Forecast test period using selected model + seasonal-naive extrapolation
 # ---------------------------------------------------------------------------
 
-fc_stl_arima <- forecast(model_stl_arima, h = length(test_vals))
+fc_stl_arima <- forecast(model_stl_arima, h = length(test_vals), level = c(80, 95))
 fc_stl_arima_final <- as.numeric(fc_stl_arima$mean) + seasonal_fc_test
 
 mape_stl_arima <- mean(abs((test_vals - fc_stl_arima_final) / test_vals)) * 100
@@ -466,6 +467,21 @@ generate_forecast_chart(
   mape = mape_stl_arima,
   output_path = "forecast.png",
   title_suffix = "",
+  model_name = model_label
+)
+
+# ---------------------------------------------------------------------------
+# Forecast-vs-actual chart (forecast_vs_actual.R)
+# Hold-out period only: training history + shaded 80%/95% CI forecast
+# ribbon vs the actual test values overlaid in red, default ggplot theme.
+# ---------------------------------------------------------------------------
+
+generate_forecast_vs_actual_chart(
+  train,
+  test,
+  fc_stl_arima,
+  seasonal_fc_test,
+  output_path = "forecast_vs_actual.png",
   model_name = model_label
 )
 
