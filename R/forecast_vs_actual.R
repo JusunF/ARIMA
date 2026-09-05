@@ -1,26 +1,4 @@
 # forecast_vs_actual.R
-#
-# Recreates the "SARIMA(...) - Forecast vs Actual" style chart:
-#   - default ggplot2 grey theme (no custom theme/palette)
-#   - training history in black
-#   - forecast mean in blue, with 80%/95% shaded confidence ribbons
-#   - actual hold-out values overlaid in red on top of the forecast
-#
-# Usage (inside STLARIMA.R, AFTER model_stl_arima has been fit):
-#
-#   fc_stl_arima <- forecast(model_stl_arima, h = length(test_vals), level = c(80, 95))
-#
-#   generate_forecast_vs_actual_chart(
-#     train, test, fc_stl_arima, seasonal_fc_test,
-#     output_path = "forecast_vs_actual.png",
-#     model_name  = model_label   # e.g. "STLARIMA(2,1,2)"
-#   )
-#
-# Note: `fc_stl_arima$mean/$lower/$upper` are on the seasonally-ADJUSTED
-# scale. seasonal_fc_test (the deterministic seasonal-naive extrapolation)
-# must be added back to the mean AND to the lower/upper bounds, since it
-# doesn't contribute any extra uncertainty of its own - it's a constant
-# shift per period, not a random component.
 
 library(ggplot2)
 
@@ -87,7 +65,7 @@ generate_forecast_vs_actual_chart <- function(train,
     labs(
       title = paste0(model_name, " - Forecast vs Actual"),
       x = "Time",
-      y = "train"
+      y = "Monthly Ridership"
     ) +
     theme_gray(base_size = 13)
   

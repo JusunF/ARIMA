@@ -13,7 +13,7 @@ from statsmodels.tsa.seasonal import STL
 # 1. LOAD DATA (monthly aggregated)
 # ============================================================
 
-FILE_PATH = "ridership_ampang_monthly.csv"
+FILE_PATH = "ridership_headline.csv"
 DATE_COLUMN = "date"
 VALUE_COLUMN = "rail_lrt_ampang"
 
