@@ -10,10 +10,6 @@ library(forecast)
 library(ggplot2)
 library(tseries)
 
-# ---------------------------------------------------------------------
-# Load data and aggregate daily -> monthly (row-count safety check so a
-# silent gap in the source data doesn't get passed into ts()).
-# ---------------------------------------------------------------------
 df <- read_csv("ridership_headline.csv", show_col_types = FALSE)
 df$date <- as.Date(df$date)
 
@@ -29,14 +25,6 @@ stopifnot(nrow(monthly) == length(expected_months))
 cat("Monthly series:", nrow(monthly), "months,",
     format(min(monthly$month)), "to", format(max(monthly$month)), "\n")
 
-# ---------------------------------------------------------------------
-# MCO resolution: Malaysia's MCO lockdown (Mar 2020 - Dec 2021) is a
-# known intervention, not a statistically-detected outlier, so the
-# window is set from domain knowledge and every month is kept (none
-# dropped). Steps: mask the 22 MCO months -> linear-interpolate a
-# placeholder -> STL decompose the interpolated series -> replace the
-# masked months with STL trend + seasonal.
-# ---------------------------------------------------------------------
 mco_start <- as.Date("2020-03-01")
 mco_end   <- as.Date("2021-12-01")
 
@@ -68,7 +56,6 @@ print(monthly %>% filter(is_mco) %>%
 
 ampang_ts <- ts(monthly$rail_lrt_ampang, start = ts_start, frequency = 12)
 
-# context exhibit: raw crash vs linear-only vs STL-imputed
 p_mco <- autoplot(cbind(
   Raw         = ts(monthly$value_raw,    start = ts_start, frequency = 12),
   Linear_only = ts(monthly$value_linear, start = ts_start, frequency = 12),
@@ -80,15 +67,12 @@ p_mco <- autoplot(cbind(
 print(p_mco)
 ggsave("mco_imputation_comparison.png", p_mco, width = 9, height = 5, dpi = 150, bg = "white")
 
-
-# train / test split - last 12 months (one full seasonal cycle)
 h <- 12
 n <- length(ampang_ts)
 
 train_ts  <- ts(head(as.numeric(ampang_ts), n - h), start = start(ampang_ts), frequency = 12)
 test_vals <- tail(as.numeric(ampang_ts), h)
 
-# pulse dummies for two known service interventions
 intervention_dates <- as.Date(c("2022-06-01", "2023-04-01"))
 xreg_all <- sapply(intervention_dates, function(d) as.numeric(monthly$month == d))
 colnames(xreg_all) <- paste0("pulse_", format(intervention_dates, "%Y%m"))
@@ -97,8 +81,6 @@ xreg_train  <- head(xreg_all, n - h)
 xreg_test   <- tail(xreg_all, h)
 xreg_future <- matrix(0, nrow = 6, ncol = ncol(xreg_all), dimnames = list(NULL, colnames(xreg_all)))
 
-# STL-decompose the training series and pull out the seasonally-adjusted
-# series to model, plus the seasonal component to add back afterwards
 stl_train      <- stl(train_ts, s.window = "periodic", robust = TRUE)
 seasadj_train  <- seasadj(stl_train)
 seasonal_train <- as.numeric(stl_train$time.series[, "seasonal"])
@@ -118,19 +100,33 @@ print(kpss.test(seasadj_train, null = "Level"))
 cat("\n== KPSS on seas-adj train, differenced ==\n")
 print(kpss.test(diff_seasadj_train, null = "Level"))
 
-png("stl_acf_pacf_comparison.png", width = 1200, height = 1000, res = 150)
-par(mfrow = c(2, 1))
-acf(diff_seasadj_train,  lag.max = 40, main = "ACF - Differenced Seasonally-Adjusted Series")
-pacf(diff_seasadj_train, lag.max = 40, main = "PACF - Differenced Seasonally-Adjusted Series")
-dev.off()
+acf_vals  <- acf(diff_seasadj_train,  lag.max = 25, plot = FALSE)
+pacf_vals <- pacf(diff_seasadj_train, lag.max = 25, plot = FALSE)
+ci_bound  <- 1.96 / sqrt(length(diff_seasadj_train))
 
+acf_df  <- data.frame(lag = round(as.numeric(acf_vals$lag) * 12), value = as.numeric(acf_vals$acf),
+                      type = "Autocorrelation Function (ACF)")
+acf_df  <- acf_df[acf_df$lag > 0, ]
+pacf_df <- data.frame(lag = round(as.numeric(pacf_vals$lag) * 12), value = as.numeric(pacf_vals$acf),
+                      type = "Partial Autocorrelation Function (PACF)")
 
-# ---------------------------------------------------------------------
-# STLARIMA grid search: fit ARIMA(p,d,q) on the seasonally-adjusted
-# training series for every combination in p,d,q = 0:9, add the
-# extrapolated seasonal back on, and score by hold-out MAPE, AIC/AICc/
-# BIC, and Ljung-Box p-value.
-# ---------------------------------------------------------------------
+acf_pacf_df <- rbind(acf_df, pacf_df)
+acf_pacf_df$type <- factor(acf_pacf_df$type,
+                           levels = c("Autocorrelation Function (ACF)", "Partial Autocorrelation Function (PACF)"))
+
+p_acf_pacf <- ggplot(acf_pacf_df, aes(x = lag, y = value)) +
+  geom_col(fill = "#3366FF", width = 0.6) +
+  geom_hline(yintercept = c(-ci_bound, ci_bound), linetype = "dashed", color = "grey40") +
+  geom_hline(yintercept = 0, color = "black") +
+  facet_wrap(~type, ncol = 1, scales = "free_x") +
+  scale_y_continuous(limits = c(-1, 1)) +
+  labs(title = "ACF/PACF Comparison",
+       subtitle = "Differenced Seasonally-Adjusted Series (d = 1)",
+       x = "Lag (months)", y = "Correlation") +
+  theme_minimal()
+print(p_acf_pacf)
+ggsave("stl_acf_pacf_comparison.png", p_acf_pacf, width = 10, height = 8, dpi = 150, bg = "white")
+
 cat("\n============================================================\n")
 cat("STARTING STLARIMA GRID SEARCH (p,d,q = 0:9)\n")
 cat("============================================================\n")
@@ -172,8 +168,6 @@ grid_results <- grid_results[order(grid_results$MAPE), ]
 cat("\n--- Top 10 STLARIMA candidates by hold-out MAPE ---\n")
 print(head(grid_results, 10), row.names = FALSE)
 
-# pick the lowest-MAPE model among those passing Ljung-Box (p > 0.05);
-# within 1.0pp MAPE of that winner, prefer the lowest AIC (parsimony)
 valid <- grid_results %>% filter(LB_pvalue > 0.05) %>% arrange(MAPE)
 
 if (nrow(valid) == 0) {
@@ -195,7 +189,6 @@ cat(sprintf(
 ))
 
 
-# fit the selected order on the training set (with interventions) and evaluate
 model_train <- Arima(seasadj_train, order = selected_order, xreg = xreg_train)
 print(summary(model_train))
 
@@ -223,10 +216,6 @@ cat("\n== Ljung-Box on training-fit residuals ==\n")
 print(Box.test(residuals(model_train), lag = 6,  type = "Ljung-Box", fitdf = sum(selected_order[c(1, 3)])))
 print(Box.test(residuals(model_train), lag = 12, type = "Ljung-Box", fitdf = sum(selected_order[c(1, 3)])))
 
-
-# ---------------------------------------------------------------------
-# Refit on the full series and forecast Jul-Dec 2026
-# ---------------------------------------------------------------------
 stl_full      <- stl(ampang_ts, s.window = "periodic", robust = TRUE)
 seasadj_full  <- seasadj(stl_full)
 seasonal_full <- as.numeric(stl_full$time.series[, "seasonal"])
@@ -247,7 +236,6 @@ print(Box.test(residuals(final_model), lag = 18, type = "Ljung-Box", fitdf = sum
 print(Box.test(residuals(final_model), lag = 24, type = "Ljung-Box", fitdf = sum(selected_order[c(1, 3)])))
 
 print(summary(final_model))
-
 
 # outputs
 model_label <- paste0(
