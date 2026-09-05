@@ -100,7 +100,6 @@ test  <- tail(y, h)
 
 LAG_MAX <- 16
 
-
 # EDA
 p_stl <- autoplot(stl(y, s.window = "periodic", robust = TRUE)) +
   ggtitle("STL decomposition")
@@ -306,6 +305,8 @@ dir.create("output/plots/eda", recursive = TRUE, showWarnings = FALSE)
 dir.create("output/plots/group_summary", recursive = TRUE, showWarnings = FALSE)
 dir.create("output/tables", recursive = TRUE, showWarnings = FALSE)
 write.csv(results, "output/tables/arima_result.csv", row.names = FALSE)
+write.csv(grid_results, "output/tables/arima_grid.csv", row.names = FALSE)
+write.csv(cv_arima, "output/tables/arima_rolling_cv.csv", row.names = FALSE)
 
 ggsave("output/plots/eda/stl_decomposition.png", p_stl,
        width = 9, height = 6, dpi = 150)
@@ -327,5 +328,5 @@ dev.copy(png, filename = "output/plots/group_summary/resid_arima.png",
          width = 900, height = 700, res = 130)
 dev.off()
 
-cat("\nDone. Wrote output/tables/arima_result.csv, 3 plots to",
+cat("\nDone. Wrote output/tables/arima_result.csv, output/tables/arima_grid.csv, and output/tables/arima_rolling_cv.csv, 3 plots to",
     "output/plots/eda/, and 2 plots to output/plots/group_summary/\n")
